@@ -256,6 +256,31 @@ contract Token {
     }
 
     #[test]
+    fn parses_typescript_export_type_star() {
+        // regression: TypeScript 5.0 `export type * from "x"` and
+        // `export type * as ns from "x"` produced ERROR nodes because the
+        // vendored grammar only knew `export type { ... } from`.
+        for (name, source) in [
+            ("a.ts", "export type * from \"./types\";\n"),
+            ("b.ts", "export type * as ns from \"./types\";\n"),
+            ("c.tsx", "export type * from \"./types\";\n"),
+        ] {
+            let tree = parse_path(source, Language::JavaScript, Path::new(name))
+                .expect("TypeScript parser should produce a tree");
+            assert!(!tree.root_node().has_error(), "{name} must parse cleanly");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_typescript_export_type_star() {
+        // `export type *` without a module specifier is still invalid.
+        let source = "export type *;\n";
+        let tree = parse_path(source, Language::JavaScript, Path::new("bad.ts"))
+            .expect("TypeScript parser should produce a tree");
+        assert!(tree.root_node().has_error());
+    }
+
+    #[test]
     fn rejects_malformed_bash() {
         // Genuinely invalid bash must still produce parse errors.
         let source = "if [[ -f /tmp/x ]\n"; // missing closing ']]'
