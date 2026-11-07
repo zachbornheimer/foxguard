@@ -2,8 +2,9 @@ name: Fork Release
 
 # Fork-only release: builds the macOS arm64 binary from the tagged commit and
 # attaches it with a checksum file. Triggered by tags such as v0.14.1-fork.1.
-# Upstream's Release workflow (workflow.yml) ignores these tags because it
-# needs publishing secrets this fork does not have.
+# Upstream's Release workflow (workflow.yml) also matches `v*` tags but needs
+# publishing secrets this fork does not have, so it is disabled in the fork's
+# Actions settings.
 
 on:
   push:
@@ -21,21 +22,14 @@ jobs:
     name: Build and release macOS arm64
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # 1.97.1
         with:
           toolchain: "1.88.0"
           targets: aarch64-apple-darwin
-
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-aarch64-apple-darwin-cargo-fork-release-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-aarch64-apple-darwin-cargo-fork-release-
 
       - name: Build
         run: cargo build --locked --release --bin foxguard --target aarch64-apple-darwin
@@ -49,9 +43,7 @@ jobs:
           cat checksums.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: release/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "${TAG}" release/* --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes
